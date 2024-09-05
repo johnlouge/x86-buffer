@@ -5,10 +5,12 @@ Below will be visible all of the functions the module provides.
 
 This program is licensed under the MIT License (same as Lua license).
 
+This program uses the lua-bit-numberlia module of David Manura, and the vanilla buffer of Micah Reid.
+
 ### **Legend:**
 
 | Method        | Behaviour     | Input  | Output |
-| :-------------: |-------------|:----| ----------:|
+| :-------------: |-----|:----| ----------:|
 | | | |
 | Common | Generic functionality. | | |
 | x86_buffer.create      | Creates a buffer | size:number (decimal max buffer length) | buffer |
