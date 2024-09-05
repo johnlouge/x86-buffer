@@ -607,7 +607,7 @@ end
 -- Functions building on r/w!
 -- String manipulation.
 x86_buffer.tostring = buffer.dumpString
-x86_buffer.fromstring = function(str,mode,offset)
+x86_buffer.fromstring = function(str,offset)
 	offset = (offset or 1)-#str
 	str = string.reverse(str) local strt = str:split("")
 	local buff = buffer.create(#str)
