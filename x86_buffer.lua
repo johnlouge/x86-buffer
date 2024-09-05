@@ -579,7 +579,7 @@ function x86_buffer.tofloat(value:number,precision:number)
 	local expo = string.format("%0"..expolen.."s",toBinary(bias+(((function() local amnt = 0 if tostring(value):split(".")[2] then for i,v in pairs(tostring(value):split(".")[2]:split("")) do if tonumber(v) and tonumber(v)==0 then amnt+=1 end end end return amnt end)())>0 and -#frac_tobase(fractioned,2):split("1")[1]-1 or #toBinary(math.floor(tonumber(value)),2)-1)))
 	return sign .. expo .. matissa
 end
-function x86_buffer.unfloat(value:string,precision:number,newnum)
+function x86_buffer.unfloat(value:string,precision:number)
 	value = tostring(value)
 	local bias = if precision==16 then 15 elseif precision==32 then 127 elseif precision==64 then 1023 else 2047 --Else: Extended Double Precision
 	local expolen = if precision==16 then 6 elseif precision==32 then 8 elseif precision==64 then 11 else 15
