@@ -473,9 +473,8 @@ x86_buffer.size=buffer.size
 
 -- Fill (fills repetitions count of value at offset). Reversed, of course.
 -- No need to mak sure value is reversed when every byte is the same.
-function x86_buffer.fill(b,offset,value,count)
-	for i=offset-count+1,offset do buffer.writeByte(b,i,value) end
-end
+function x86_buffer.fill(b,offset,value,count) for i=offset-count+1,offset do buffer.writeByte(b,i,value) end end
+x86_buffer.clear=function(b) buffer.zero(b) end
 
 -- Read/Write
 --[[ Format for read.
@@ -632,6 +631,5 @@ x86_buffer.writestring=function(b,offset,value,count)
 		x86_buffer.write(b,i,strt[offset-i+1])
 	end
 end
-x86_buffer.clear=function(b) buffer.zero(b) end
 
 return x86_buffer
