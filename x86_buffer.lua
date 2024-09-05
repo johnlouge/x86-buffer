@@ -628,7 +628,7 @@ x86_buffer.writestring=function(b,offset,value,count)
 	local strt = value:split("")
 	if count==0 then return "" end
 	for i=offset,offset-(count or #strt)+1 do
-		x86_buffer.write(b,i,strt[offset-i+1])
+		x86_buffer.write(b,i,string.byte(strt[offset-i+1]))
 	end
 end
 
