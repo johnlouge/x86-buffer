@@ -280,6 +280,9 @@ function buffer.dumpHex(b)
 	return table.concat(output, "")
 end
 function buffer.len(b)
+	return b.size
+end
+function buffer.size(b)
 	return b.len
 end
 
@@ -410,35 +413,11 @@ function buffer.zero(b)
 	b.pointerByte = 1
 end
 
+
+
 -- The x86_buffer implementation starts below.
--- Some footnotes:
--- There is no provided seucrity on giving innapropriate values for indexing.
--- You can accidentally reverse the string readings if you are not careful!
---		* i.e: a 0>= value for the count arg in x86_buffer.writestring.
---
---
--- The little-endian byte encoding can be illustrated as the following:
---
---							  1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2
---  ADDRESS 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 . . .
---	__________________________________________________________________
---  VALUE   a b c d e f g h i j k l m n o p q r s t u v w x y z A B C . . .
---         |<--------------------->|
---			1-12 READS:        |<------------------------------->|
---			"lkjihgfedcba"		 11-27 READS:
---			IN LITTLE ENDIAN     "Azyxwvutsrqponmlk"
---								 IN LITTLE ENDIAN.
---
--- Which basically means, for read/write:
---
---							  1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2
---  ADDRESS 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 . . .
---	__________________________________________________________________
---  VALUE   a b c d e f g h i j k l m n o p q r s t u v w x y z A B C . . .
---		   |<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<|
---			READING/WRITING FROM OFFSET 21 READS/WRITES TO OFFSET 1, 
---			READING GIVES: * "utsrqponmlkjihgfedcba" *
---
+
+
 
 local x86_buffer = {}
 local float = _G.float
@@ -494,7 +473,7 @@ x86_buffer.size=buffer.size
 
 -- Fill (fills repetitions count of value at offset). Reversed, of course.
 -- No need to mak sure value is reversed when every byte is the same.
-function x86_buffer.fill(b:buffer,offset:number,value:number,count:number)
+function x86_buffer.fill(b,offset,value,count)
 	for i=offset-count+1,offset do buffer.writeByte(b,i,value) end
 end
 
@@ -564,38 +543,40 @@ Sign  79  78	 64  63  62						  0	  (64 bits)
 		      normalized result if subsequent operations on the denormal can be normalized. "	   
 ]]
 -- The float conversion function itself.
-function x86_buffer.tofloat(value:number,precision:number)
+function x86_buffer.tofloat(value,precision)
 	local sign = "0"
 	if 0>value then value=-value sign = "1" end 
 
-	local bias = if precision==16 then 15 elseif precision==32 then 127 elseif precision==64 then 1023 else 2047 --Else: Extended Double Precision
-	local expolen = if precision==16 then 6 elseif precision==32 then 8 elseif precision==64 then 11 else 15
-	local matissalen = if precision==10 then 10 elseif precision==32 then 23 elseif precision==64 then 52 else 63
+	local bias if precision==16 then bias=15 elseif precision==32 then bias=127 elseif precision==64 then bias=1023 else bias=2047 end --Else: Extended Double Precision
+	local expolen if precision==16 then expolen=6 elseif precision==32 then expolen=8 elseif precision==64 then expolen=11 else expolen=15 end
+	local matissalen if precision==10 then matissalen=10 elseif precision==32 then matissalen=23 elseif precision==64 then matissalen=52 else matissalen=63 end
 
 	local value = realval(value) -- *Real* value. Since Lua tends to use the negative exponentiation at very long fractions, this conversion is done.
 	local fractioned = tonumber("0"..string.sub(tostring(value),#tostring(math.floor(tonumber(value)))+1,#tostring(value))) -- Fixed fraction value
-	local matissa = string.sub(toBinary(math.floor(tonumber(value)))..frac_tobase(fractioned,2),2);matissa..=string.rep("0",matissalen-#matissa) -- Matissa/Fraction. Whatever you may call it
-	matissa=if matissa:sub(matissalen+1,matissalen+1)=="1" then string.sub(matissa,1,matissalen-2).."10" else string.sub(matissa,1,matissalen-2).."00" -- Mysterious IEEE-754 roundup/down feature. To make numbers even less accurate who knows.
-	local expo = string.format("%0"..expolen.."s",toBinary(bias+(((function() local amnt = 0 if tostring(value):split(".")[2] then for i,v in pairs(tostring(value):split(".")[2]:split("")) do if tonumber(v) and tonumber(v)==0 then amnt+=1 end end end return amnt end)())>0 and -#frac_tobase(fractioned,2):split("1")[1]-1 or #toBinary(math.floor(tonumber(value)),2)-1)))
+	local matissa = string.sub(toBinary(math.floor(tonumber(value)))..frac_tobase(fractioned,2),2);matissa=mantissa..string.rep("0",matissalen-#matissa) -- Matissa/Fraction. Whatever you may call it
+	if matissa:sub(matissalen+1,matissalen+1)=="1" then matissa=string.sub(matissa,1,matissalen-2).."10" else matissa=string.sub(matissa,1,matissalen-2).."00" end -- Mysterious IEEE-754 roundup/down feature. To make numbers even less accurate who knows.
+	local expo = string.format("%0"..expolen.."s",toBinary(bias+(((function() local amnt = 0 if tostring(value):split(".")[2] then for i,v in pairs(tostring(value):split(".")[2]:split("")) do if tonumber(v) and tonumber(v)==0 then amnt=amnt+1 end end end return amnt end)())>0 and -#frac_tobase(fractioned,2):split("1")[1]-1 or #toBinary(math.floor(tonumber(value)),2)-1)))
 	return sign .. expo .. matissa
 end
-function x86_buffer.unfloat(value:string,precision:number)
+function x86_buffer.unfloat(value,precision)
 	value = tostring(value)
-	local bias = if precision==16 then 15 elseif precision==32 then 127 elseif precision==64 then 1023 else 2047 --Else: Extended Double Precision
-	local expolen = if precision==16 then 6 elseif precision==32 then 8 elseif precision==64 then 11 else 15
-	local matissalen = if precision==10 then 10 elseif precision==32 then 23 elseif precision==64 then 52 else 63
+	local bias if precision==16 then bias=15 elseif precision==32 then bias=127 elseif precision==64 then bias=1023 else bias=2047 end --Else: Extended Double Precision
+	local expolen if precision==16 then expolen=6 elseif precision==32 then expolen=8 elseif precision==64 then expolen=11 else expolen=15 end
+	local matissalen if precision==10 then matissalen=10 elseif precision==32 then matissalen=23 elseif precision==64 then matissalen=52 else matissalen=63 end
 
 	local tolling=unbin(value:sub(2,1+expolen))-bias
 	local v1,v2 = value:sub(1+expolen,1+expolen+tolling),value:sub(1+expolen+tolling+1,#value)
 	local mantissa = tostring(frac_unbin(v2)):sub(3) 
-	return (value:sub(1,1)=="1" and "-" or "") .. (math.floor(tonumber(unbin(v1)+(if table.pack(math.modf(#v1/2))[2]==0 then (2^(#v1-1)) else 0)))) .. (mantissa=="" and mantissa or "." .. mantissa) 
+  
+  local resolve if table.pack(math.modf(#v1/2))[2]==0 then resolve=(2^(#v1-1)) else resolve=0 end
+	return (value:sub(1,1)=="1" and "-" or "") .. (math.floor(tonumber(unbin(v1)+resolve))) .. (mantissa=="" and mantissa or "." .. mantissa) 
 end
 
 -- For simplification, instead of all the seperate r/w
 -- functions, here are two.
 -- First argument can be of the predescribed forms above,
 -- second if offset, for write third is a numeric value.
-function x86_buffer.read(b:buffer,mode:string,offset:number)
+function x86_buffer.read(b,mode,offset)
 	local t,a = string.sub(mode,1,1),tonumber(string.sub(mode,2,#mode))/8
 	if t and a then
 		local value = 0
@@ -617,7 +598,7 @@ end
 -- in float) the writing is always signed, during
 -- the use of the read function above the mode can
 -- be decided. Offset is a number, value is a number.
-function x86_buffer.write(b:buffer,offset:number,value:number)
+function x86_buffer.write(b,offset,value)
 	local offsetting = math.ceil(math.log(value,2))/8
 	for i=0,offsetting do
 		buffer.writeByte(b,offset-offsetting+i,bit32.rrotate(value,0x8*(i)))
@@ -627,30 +608,30 @@ end
 -- Functions building on r/w!
 -- String manipulation.
 x86_buffer.tostring = buffer.dumpString
-x86_buffer.fromstring = function(str,mode:number,offset:number?)
+x86_buffer.fromstring = function(str,mode,offset)
 	offset = (offset or 1)-#str
 	str = string.reverse(str) local strt = str:split("")
 	local buff = buffer.create(#str)
 	for i=offset,offset+#str-1 do x86_buffer.write(buff,offset,strt[i-offset+1]) end
 	return buff
 end
-x86_buffer.readstring=function(b:buffer,offset:number,count)
+x86_buffer.readstring=function(b,offset,count)
 	local str = ""
 	for i=offset,offset-count+1 do
-		str..=string.char(x86_buffer.read(b,"u8",i))
+		str=str..string.char(x86_buffer.read(b,"u8",i))
 	end
 	return str
 end
-x86_buffer.revrstring=function(b:buffer,offset:number,count)
+x86_buffer.revrstring=function(b,offset,count)
 	return string.reverse(x86_buffer.readstring(b,offset,count))
 end
-x86_buffer.writestring=function(b:buffer,offset:number,value:string,count:number?)
+x86_buffer.writestring=function(b,offset,value,count)
 	local strt = value:split("")
 	if count==0 then return "" end
 	for i=offset,offset-(count or #strt)+1 do
 		x86_buffer.write(b,i,strt[offset-i+1])
 	end
 end
-x86_buffer.clear=function(b:buffer) buffer.zero(b) end
+x86_buffer.clear=function(b) buffer.zero(b) end
 
 return x86_buffer
