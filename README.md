@@ -35,4 +35,4 @@ This program uses the lua-bit-numberlia module of David Manura, and the vanilla 
 | x86_buffer.writestring      | Writes a given string at a certain offset as its own byte representation into the buffer, up to an optional count. If count is 0, nothing is written. If count is nil, the whole string is written. | buffer,offset:number,value:string,count:number (optional max amount of bytes to write), | nil |
 | | | |
 
-###### 2024 (c) John Louge
+###### 2024 (c) p-akos
